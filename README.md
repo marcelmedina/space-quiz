@@ -18,6 +18,7 @@ Start-Process .\index.html
 
 ## Features
 
+- A welcome screen that requires your name before starting the quiz and mission timer.
 - Ten multiple-choice questions with an explanatory fact after every answer.
 - Live score, segmented progress bar, and completion percentage.
 - Green feedback for correct answers and a red shake for incorrect selections.
@@ -26,13 +27,17 @@ Start-Process .\index.html
 - A centered, responsive layout with automatic light and dark themes.
 - Native buttons, visible keyboard focus, accessible status updates, and reduced-motion support.
 
-Each question accepts one answer. Progress advances when an answer is selected; Next moves to the following question. Replay or reloading the page starts a new quiz.
+Enter your name and select Start quiz to begin. Your name is displayed throughout the quiz and results, stays only in memory, and is retained for replay. Reloading returns to the welcome screen and clears the name and quiz state.
+
+Each question accepts one answer. Progress advances when an answer is selected; Next moves to the following question. Replay starts a new quiz with the same name.
 
 ## Development
 
 All markup, styles, question data, and JavaScript are in `index.html`. Edit it and reload the browser to see changes. There is no build step, configured linter, or automated test runner.
 
-For a quick single-question smoke check, select Saturn on question 1: the score should become 1 point, progress should reach 10%, and green feedback should appear. Reload and select Jupiter to check red feedback, an unchanged score, and the correct answer reveal.
+First check that an empty or whitespace-only name cannot start the quiz, then enter a name and start using Enter or the Start quiz button. The timer should start only after submission, and focus should move to the first question.
+
+For a quick single-question smoke check, select Saturn on question 1: the score should become 1 point, progress should reach 10%, and green feedback should appear. Reload, enter a name, start, and select Jupiter to check red feedback, an unchanged score, and the correct answer reveal.
 
 For a full smoke check, finish the quiz with mixed answers and verify the score, accuracy, best streak, results reaction, and replay reset. Check Tab/Shift+Tab navigation and Enter/Space activation, both color schemes, reduced motion, and narrow mobile layouts.
 
