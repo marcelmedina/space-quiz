@@ -29,7 +29,7 @@ Question-count assumptions span the data, copy, progressbar maximum, ten-segment
 
 `scores.json` in the repository root is the leaderboard database; the Pages workflow deploys it alongside `index.html`. The results screen's "Save to leaderboard" link (built by `scoreIssueUrl()`) opens a prefilled GitHub issue titled `[score] …` with a fenced JSON block of `name`, `score`, `total`, `timeMs`, and `mode`. Never embed tokens in the page.
 
-`.github/workflows/record-score.yml` runs on opened `[score]` issues, validates the JSON (name 1-80 chars, integer score 0-10, time 1s-24h, no duplicate issue number), appends and sorts entries by score then time, commits to the default branch, comments, and closes the issue. Its completion triggers `pages.yml` via `workflow_run` because `GITHUB_TOKEN` pushes do not trigger push workflows. `loadLeaderboard()` renders the top 10 with `textContent`. The total of 10 is also hard-coded in the workflow.
+`.github/workflows/record-score.yml` runs on opened `[score]` issues, validates the JSON (name 1-80 chars, integer score 0-10, time 1s-24h, no duplicate issue number), then appends, sorts by score then time, and pushes to the default branch, retrying against the latest commit so parallel submissions are never lost. It then comments, and closes the issue. Its completion triggers `pages.yml` via `workflow_run` because `GITHUB_TOKEN` pushes do not trigger push workflows. `loadLeaderboard()` renders the top 10 with `textContent`. The total of 10 is also hard-coded in the workflow.
 
 ## UI and accessibility conventions
 

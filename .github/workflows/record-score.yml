@@ -8,10 +8,6 @@ permissions:
   contents: write
   issues: write
 
-concurrency:
-  group: record-score
-  cancel-in-progress: false
-
 jobs:
   record:
     if: startsWith(github.event.issue.title, '[score]')
@@ -21,12 +17,11 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
 
-      - name: Validate and append score
+      - name: Validate score
         id: record
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require("fs");
             const issue = context.payload.issue;
             const fail = reason => { core.setOutput("error", reason); core.setOutput("saved", "false"); };
             const match = /```json\s*([\s\S]*?)```/.exec(issue.body || "");
@@ -38,40 +33,64 @@ jobs:
             if (!name || name.length > 80) return fail("The name must be 1-80 characters.");
             if (!Number.isInteger(data.score) || data.score < 0 || data.score > total) return fail(`The score must be a whole number from 0 to ${total}.`);
             if (!Number.isFinite(data.timeMs) || data.timeMs < 1000 || data.timeMs > 86400000) return fail("The time must be between 1 second and 24 hours.");
-            const mode = data.mode === "shuffled" ? "shuffled" : "ordered";
-            const scores = JSON.parse(fs.readFileSync("scores.json", "utf8"));
-            if (scores.some(entry => entry.issue === issue.number)) return fail("This issue was already recorded.");
-            scores.push({
+            core.setOutput("entry", JSON.stringify({
               name,
               score: data.score,
               total,
               timeMs: Math.round(data.timeMs),
-              mode,
+              mode: data.mode === "shuffled" ? "shuffled" : "ordered",
               submittedBy: issue.user.login,
               issue: issue.number,
               date: issue.created_at
-            });
-            scores.sort((a, b) => b.score - a.score || a.timeMs - b.timeMs || a.date.localeCompare(b.date));
-            fs.writeFileSync("scores.json", JSON.stringify(scores, null, 2) + "\n");
-            core.setOutput("saved", "true");
+            }));
+            core.setOutput("valid", "true");
 
-      - name: Commit scores.json
-        if: steps.record.outputs.saved == 'true'
+      # Submissions run in parallel; each retries against the latest main so none are lost.
+      - name: Append to scores.json and push
+        id: commit
+        if: steps.record.outputs.valid == 'true'
         env:
+          ENTRY: ${{ steps.record.outputs.entry }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scores.json
-          git commit -m "Record quiz score from #${ISSUE_NUMBER}"
-          git push
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            git fetch --quiet origin "$BRANCH"
+            git reset --quiet --hard "origin/$BRANCH"
+            result=$(node -e '
+              const fs = require("fs");
+              const entry = JSON.parse(process.env.ENTRY);
+              const scores = JSON.parse(fs.readFileSync("scores.json", "utf8"));
+              if (scores.some(e => e.issue === entry.issue)) { console.log("duplicate"); process.exit(); }
+              scores.push(entry);
+              scores.sort((a, b) => b.score - a.score || a.timeMs - b.timeMs || a.date.localeCompare(b.date));
+              fs.writeFileSync("scores.json", JSON.stringify(scores, null, 2) + "\n");
+              console.log("added");
+            ')
+            if [ "$result" = "duplicate" ]; then
+              echo "saved=false" >> "$GITHUB_OUTPUT"
+              echo "error=This issue was already recorded." >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git add scores.json
+            git commit --quiet -m "Record quiz score from #${ISSUE_NUMBER}"
+            if git push --quiet origin "HEAD:$BRANCH"; then
+              echo "saved=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep $((RANDOM % 5 + attempt))
+          done
+          echo "saved=false" >> "$GITHUB_OUTPUT"
+          echo "error=The leaderboard was busy. Please try submitting again." >> "$GITHUB_OUTPUT"
 
       - name: Reply and close issue
         if: always()
         uses: actions/github-script@v7
         env:
-          SAVED: ${{ steps.record.outputs.saved }}
-          ERROR: ${{ steps.record.outputs.error }}
+          SAVED: ${{ steps.commit.outputs.saved }}
+          ERROR: ${{ steps.commit.outputs.error || steps.record.outputs.error }}
         with:
           script: |
             const saved = process.env.SAVED === "true";
