@@ -3,9 +3,6 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-  workflow_run:
-    workflows: [Record quiz score]
-    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -19,7 +16,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -29,7 +25,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir _site
-          cp index.html scores.json _site/
+          cp index.html _site/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
