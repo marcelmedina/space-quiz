@@ -43,6 +43,8 @@
     .telemetry { padding: 17px 18px; margin-bottom: 24px; background: var(--card); border: 1px solid var(--border); border-top: 2px solid var(--accent); border-radius: 8px; }
     .telemetry-heading, .progress-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
     .telemetry-heading { margin-bottom: 14px; text-transform: uppercase; letter-spacing: 1.4px; font-weight: 650; }
+    .telemetry-status { display: flex; align-items: center; gap: 10px; }
+    .mission-time { color: var(--text); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: .5px; }
     .telemetry-indicator { width: 6px; height: 6px; background: var(--green); border-radius: 50%; box-shadow: 0 0 8px var(--green-bg); }
     .mission { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; gap: 12px; font-size: 13px; }
     .mission, .progress-caption { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; }
@@ -92,7 +94,7 @@
     .final-score { font-size: 64px; font-weight: 750; letter-spacing: -3px; line-height: 1.2; margin: 26px 0 4px; color: var(--accent); }
     .final-score small { font-size: 25px; color: var(--muted); letter-spacing: -1px; }
     .score-caption { font-size: 12px; color: var(--muted); }
-    .result-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 25px 0; }
+    .result-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 25px 0; }
     .stat { border-radius: 11px; background: var(--surface); padding: 13px; color: var(--muted); font-size: 12px; }
     .stat strong { display: block; font-size: 21px; color: var(--text); }
     .replay-actions { display: grid; gap: 11px; }
@@ -108,7 +110,7 @@
       .answer.correct .letter { color: #fff; }
       .answer.wrong .letter { color: #fff; }
     }
-    @media (max-width: 480px) { body { padding: 30px 16px 24px; } .card { padding: 23px 20px; } header { margin-bottom: 25px; } h2 { font-size: 21px; } }
+    @media (max-width: 480px) { body { padding: 30px 16px 24px; } .card { padding: 23px 20px; } header { margin-bottom: 25px; } h2 { font-size: 21px; } .result-stats { gap: 8px; } .stat { padding: 12px 6px; } }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
   </style>
 </head>
@@ -124,7 +126,7 @@
       <p class="subtitle">10 questions. One cosmic adventure.</p>
     </header>
     <div class="telemetry" role="group" aria-label="Mission control">
-      <div class="telemetry-heading"><span>Mission control</span><span class="telemetry-indicator" aria-hidden="true"></span></div>
+      <div class="telemetry-heading"><span>Mission control</span><span class="telemetry-status"><span class="mission-time">T+ <span id="timer" role="timer" aria-label="Mission time">00:00</span></span><span class="telemetry-indicator" aria-hidden="true"></span></span></div>
       <div class="mission">
         <div class="mission-label" id="question-count"><strong>Question 01</strong> / 10</div>
         <div class="score"><span class="score-label" id="score-label">Score</span><span id="score" role="status" aria-labelledby="score-label" aria-atomic="true">0 points</span></div>
@@ -156,6 +158,7 @@
       <div class="result-stats">
         <div class="stat"><strong id="accuracy"></strong>Accuracy</div>
         <div class="stat"><strong id="best-streak"></strong>Best streak</div>
+        <div class="stat"><strong id="total-time"></strong>Time</div>
       </div>
       <div class="replay-actions">
         <button class="next" id="restart">Explore again <span aria-hidden="true">↻</span></button>
@@ -181,6 +184,29 @@
     const $ = id => document.getElementById(id);
     let current = 0, score = 0, answered = false, streak = 0, bestStreak = 0;
     let attemptOrder = [...questions];
+    let startTime = 0, timerId = null;
+
+    function formatTime(ms) {
+      const total = Math.floor(ms / 1000);
+      return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+    }
+    function describeTime(ms) {
+      const total = Math.floor(ms / 1000), m = Math.floor(total / 60), s = total % 60;
+      return m ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
+    }
+    function startTimer() {
+      clearInterval(timerId);
+      startTime = performance.now();
+      $("timer").textContent = "00:00";
+      timerId = setInterval(() => { $("timer").textContent = formatTime(performance.now() - startTime); }, 250);
+    }
+    function stopTimer() {
+      clearInterval(timerId);
+      timerId = null;
+      const elapsed = performance.now() - startTime;
+      $("timer").textContent = formatTime(elapsed);
+      return elapsed;
+    }
     const progress = document.querySelector(".progress");
     const progressFill = document.querySelector(".progress-fill");
 
@@ -266,6 +292,7 @@
     $("next").addEventListener("click", () => {
       if (!answered) return;
       if (current < questions.length - 1) { current++; renderQuestion(true); return; }
+      const elapsed = stopTimer();
       $("quiz").hidden = true;
       $("results").hidden = false;
       $("question-count").textContent = "Adventure complete";
@@ -276,6 +303,7 @@
       $("final-score").textContent = score;
       $("accuracy").textContent = `${score * 10}%`;
       $("best-streak").textContent = bestStreak;
+      $("total-time").textContent = describeTime(elapsed);
       $("result-title").focus();
     });
     function restart(shuffle = false) {
@@ -292,6 +320,7 @@
       $("quiz").hidden = false;
       updateProgress(0);
       renderQuestion(true);
+      startTimer();
     }
     $("restart").addEventListener("click", () => restart());
     $("restart-shuffled").addEventListener("click", () => restart(true));
@@ -317,6 +346,7 @@
       selectAnswer(selected);
     });
     renderQuestion();
+    startTimer();
   </script>
 </body>
 </html>
