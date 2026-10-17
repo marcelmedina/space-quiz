@@ -33,7 +33,7 @@ In `index.html`, `saveScore()` posts the result as a `text/plain` JSON body (a C
 
 For local API work, run Azurite and `func start` in `api/` (see `local.settings.json`), and point `SCORE_API` at `http://localhost:7071/api/scores` temporarily.
 
-`AdminScoresFunction` exposes an anonymous, read-only `GET /api/scores/all` (the `admin` route prefix is reserved by the Functions host) that returns `{ total, generatedAt, entries }`, newest first, capped by `?limit=` (default 200, max 1000). The quiz's `POST /api/scores` is the only write path. `admin/index.html` opens a modal `<dialog>` password prompt (Escape cannot dismiss it) and compares the input's SHA-256 against the hard-coded `PASSWORD_SHA256`; only then does it reveal the dashboard and start polling `ADMIN_API` every 10 seconds while the tab is visible. It highlights new rows and renders entries with `textContent`. The gate is cosmetic; do not treat it as security.
+`AdminScoresFunction` exposes an anonymous, read-only `GET /api/scores/all` (the `admin` route prefix is reserved by the Functions host) that returns `{ total, generatedAt, entries }`, ranked by highest score, then shortest quiz time, then earliest submission before applying `?limit=` (default 200, max 1000). The quiz's `POST /api/scores` is the only write path. `admin/index.html` opens a modal `<dialog>` password prompt (Escape cannot dismiss it) and compares the input's SHA-256 against the hard-coded `PASSWORD_SHA256`; only then does it reveal the dashboard and start polling `ADMIN_API` every 10 seconds while the tab is visible. It highlights new rows and renders entries with `textContent`. The gate is cosmetic; do not treat it as security.
 
 ## UI and accessibility conventions
 

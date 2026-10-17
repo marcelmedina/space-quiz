@@ -29,7 +29,9 @@ public sealed class AdminScoresFunction(ScoreRepository repository)
         var limit = int.TryParse(req.Query["limit"], out var requested) ? Math.Clamp(requested, 1, MaxLimit) : DefaultLimit;
         var all = await repository.GetAllAsync(cancellationToken);
         var entries = all
-            .OrderByDescending(e => e.SubmittedAt)
+            .OrderByDescending(e => e.Score)
+            .ThenBy(e => e.TimeMs)
+            .ThenBy(e => e.SubmittedAt)
             .Take(limit)
             .Select(e => new AdminScoreEntry(e.RowKey, e.Name, e.Score, e.Total, e.TimeMs, e.Mode, e.SubmittedAt));
 
