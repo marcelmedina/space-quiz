@@ -11,6 +11,7 @@ public sealed class ScoreEntity : ITableEntity
     public ETag ETag { get; set; }
 
     public string Name { get; set; } = "";
+    public string Email { get; set; } = "";
     public int Score { get; set; }
     public int Total { get; set; }
     public long TimeMs { get; set; }
