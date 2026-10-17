@@ -33,7 +33,7 @@ In `index.html`, `saveScore()` posts the result as a `text/plain` JSON body (a C
 
 For local API work, run Azurite and `func start` in `api/` (see `local.settings.json`), and point `SCORE_API` at `http://localhost:7071/api/scores` temporarily.
 
-`AdminScoresFunction` exposes `GET /api/scores/all` (the `admin` route prefix is reserved by the Functions host). It is anonymous at the platform level but requires an `X-Admin-Key` header matching the `ADMIN_API_KEY` app setting (constant-time comparison; `401` on mismatch, `503` when unset) and returns `{ total, generatedAt, entries }`, newest first, capped by `?limit=` (default 200, max 1000). `admin/index.html` asks for the key, keeps it only in `sessionStorage`, polls `ADMIN_API` every 10 seconds while the tab is visible, highlights new rows, and renders entries with `textContent`. Never hard-code the admin key in the page.
+`AdminScoresFunction` exposes an anonymous, read-only `GET /api/scores/all` (the `admin` route prefix is reserved by the Functions host) that returns `{ total, generatedAt, entries }`, newest first, capped by `?limit=` (default 200, max 1000). The quiz's `POST /api/scores` is the only write path. `admin/index.html` is a public dashboard that polls `ADMIN_API` every 10 seconds while the tab is visible, highlights new rows, and renders entries with `textContent`.
 
 ## UI and accessibility conventions
 

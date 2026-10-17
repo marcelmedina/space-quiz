@@ -45,18 +45,12 @@
     .subtitle { margin: 0; color: var(--muted); }
     a { color: var(--accent); }
     .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; margin-bottom: 20px; }
-    .key-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
-    .field { display: grid; gap: 4px; flex: 1 1 220px; }
-    label { font-size: 13px; font-weight: 600; }
-    input[type="password"] { width: 100%; padding: 9px 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
-    .hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
     .btn { padding: 9px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 600; cursor: pointer; }
-    .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
     .btn:disabled { opacity: .55; cursor: not-allowed; }
     .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
     .toolbar h2 { margin: 0; }
     .toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-    .toggle { display: inline-flex; align-items: center; gap: 6px; }
+    .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
     .toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
     .live { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 650; }
     .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
@@ -92,27 +86,13 @@
       <p class="subtitle">Live feed of every score saved through the leaderboard API. <a href="../index.html">Back to the quiz</a></p>
     </header>
 
-    <section class="card" id="auth" aria-labelledby="auth-title">
-      <h2 id="auth-title">Admin access</h2>
-      <form class="key-form" id="key-form">
-        <div class="field">
-          <label for="admin-key">Admin key</label>
-          <input type="password" id="admin-key" autocomplete="current-password" required spellcheck="false" aria-describedby="auth-hint auth-error">
-        </div>
-        <button type="submit" class="btn btn-primary">Connect</button>
-      </form>
-      <p class="hint error" id="auth-error" role="alert"></p>
-      <p class="hint" id="auth-hint">Use the Function App's <code>ADMIN_API_KEY</code> setting. The key is kept only in this tab's session storage.</p>
-    </section>
-
-    <section class="card" id="dashboard" aria-labelledby="dashboard-title" hidden>
+    <section class="card" id="dashboard" aria-labelledby="dashboard-title">
       <div class="toolbar">
-        <h2 id="dashboard-title" tabindex="-1">Submissions</h2>
+        <h2 id="dashboard-title">Submissions</h2>
         <div class="toolbar-actions">
           <span class="live" id="live"><span class="live-dot" aria-hidden="true"></span><span id="live-text">Paused</span></span>
           <label class="toggle"><input type="checkbox" id="auto-refresh" checked> Auto-refresh (10s)</label>
           <button type="button" class="btn" id="refresh">Refresh now</button>
-          <button type="button" class="btn" id="sign-out">Forget key</button>
         </div>
       </div>
       <div class="stats">
@@ -135,12 +115,10 @@
 
   <script>
     const ADMIN_API = "https://space-quiz-dxb7dmfrb2hmcfbx.australiaeast-01.azurewebsites.net/api/scores/all";
-    const KEY_STORAGE = "cosmic-quest-admin-key";
     const REFRESH_MS = 10000;
+    const NEW_HIGHLIGHT_MS = 60000;
     const $ = id => document.getElementById(id);
 
-    let adminKey = sessionStorage.getItem(KEY_STORAGE) || "";
-    const NEW_HIGHLIGHT_MS = 60000;
     let firstSeen = null;
     let timer = null;
     let loading = false;
@@ -158,7 +136,7 @@
 
     function scheduleRefresh() {
       clearInterval(timer);
-      timer = adminKey && $("auto-refresh").checked && !document.hidden ? setInterval(loadScores, REFRESH_MS) : null;
+      timer = $("auto-refresh").checked && !document.hidden ? setInterval(loadScores, REFRESH_MS) : null;
       $("live").classList.toggle("on", !!timer);
       $("live-text").textContent = timer ? "Live" : "Paused";
     }
@@ -220,15 +198,11 @@
     }
 
     async function loadScores() {
-      if (!adminKey || loading) return;
+      if (loading) return;
       loading = true;
       $("refresh").disabled = true;
       try {
-        const response = await fetch(ADMIN_API, { cache: "no-store", headers: { "X-Admin-Key": adminKey } });
-        if (response.status === 401) {
-          forgetKey("That admin key was rejected. Enter a valid key.");
-          return;
-        }
+        const response = await fetch(ADMIN_API, { cache: "no-store" });
         const data = await response.json().catch(() => null);
         if (!response.ok || !data) throw new Error(data?.error || `The API responded with ${response.status}.`);
 
@@ -245,45 +219,16 @@
       }
     }
 
-    function connect() {
-      $("auth").hidden = true;
-      $("dashboard").hidden = false;
-      $("auth-error").textContent = "";
-      setStatus("Loading scores…");
-      loadScores();
-      scheduleRefresh();
-    }
-
-    function forgetKey(message = "") {
-      adminKey = "";
-      firstSeen = null;
-      sessionStorage.removeItem(KEY_STORAGE);
-      scheduleRefresh();
-      $("admin-key").value = "";
-      $("auth-error").textContent = message;
-      $("dashboard").hidden = true;
-      $("auth").hidden = false;
-      $("admin-key").focus();
-    }
-
-    $("key-form").addEventListener("submit", event => {
-      event.preventDefault();
-      const value = $("admin-key").value.trim();
-      if (!value) return;
-      adminKey = value;
-      sessionStorage.setItem(KEY_STORAGE, adminKey);
-      connect();
-      $("dashboard-title").focus();
-    });
     $("refresh").addEventListener("click", loadScores);
     $("auto-refresh").addEventListener("change", scheduleRefresh);
-    $("sign-out").addEventListener("click", () => forgetKey());
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden && $("auto-refresh").checked) loadScores();
       scheduleRefresh();
     });
 
-    if (adminKey) connect();
+    setStatus("Loading scores…");
+    loadScores();
+    scheduleRefresh();
   </script>
 </body>
 </html>
