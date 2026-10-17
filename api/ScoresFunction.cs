@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -6,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace SpaceQuiz.Api;
 
-public sealed record ScoreSubmission(string? Name, int? Score, int? Total, double? TimeMs, string? Mode);
+public sealed record ScoreSubmission(string? Name, string? Email, int? Score, int? Total, double? TimeMs, string? Mode);
 
 public sealed record LeaderboardEntry(string Name, int Score, int Total, long TimeMs, string Mode, DateTimeOffset Date);
 
@@ -14,6 +15,7 @@ public sealed class ScoresFunction(ScoreRepository repository, ILogger<ScoresFun
 {
     public const int QuestionCount = 10;
     private const int MaxNameLength = 80;
+    private const int MaxEmailLength = 254;
     private const long MinTimeMs = 1_000;
     private const long MaxTimeMs = 86_400_000;
     private const int LeaderboardSize = 10;
@@ -58,6 +60,10 @@ public sealed class ScoresFunction(ScoreRepository repository, ILogger<ScoresFun
 
         var name = new string((submission.Name ?? "").Where(c => !char.IsControl(c)).ToArray()).Trim();
         if (name.Length is 0 or > MaxNameLength) return Error($"The name must be 1-{MaxNameLength} characters.");
+        var email = (submission.Email ?? "").Trim();
+        if (email.Length is 0 or > MaxEmailLength || email.Any(c => char.IsControl(c) || char.IsWhiteSpace(c)) ||
+            !new EmailAddressAttribute().IsValid(email))
+            return Error($"A valid email address of up to {MaxEmailLength} characters is required.");
         if (submission.Score is not { } score || score is < 0 or > QuestionCount)
             return Error($"The score must be a whole number from 0 to {QuestionCount}.");
         if (submission.TimeMs is not { } timeMs || !double.IsFinite(timeMs) || timeMs < MinTimeMs || timeMs > MaxTimeMs)
@@ -66,6 +72,7 @@ public sealed class ScoresFunction(ScoreRepository repository, ILogger<ScoresFun
         var entity = new ScoreEntity
         {
             Name = name,
+            Email = email,
             Score = score,
             Total = QuestionCount,
             TimeMs = (long)Math.Round(timeMs),

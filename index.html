@@ -59,8 +59,12 @@
     #completion { color: var(--text); }
     .card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 29px; box-shadow: 0 18px 60px #00000018; }
     .welcome-copy { margin: 0 0 23px; }
+    dialog { width: min(calc(100% - 32px), 520px); max-height: calc(100svh - 32px); overflow-y: auto; color: var(--text); }
+    dialog::backdrop { background: #0b0e18d9; }
+    dialog h2 { margin-top: 0; }
     .name-label { display: block; margin-bottom: 8px; font-weight: 650; }
     .name-input { width: 100%; padding: 12px 15px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+    .name-input + .name-label { margin-top: 16px; }
     .player-name { margin: 0 0 16px; overflow-wrap: anywhere; }
     .question-heading { display: flex; gap: 9px; align-items: center; color: var(--accent); text-transform: uppercase; font-size: 10px; font-weight: 750; letter-spacing: 1.8px; }
     .question-heading span:first-child { font-size: 16px; line-height: 1; }
@@ -140,17 +144,19 @@
       <h1>A little curiosity.<br>A whole universe.</h1>
       <p class="subtitle">10 questions. One cosmic adventure.</p>
     </header>
-    <section class="card" id="welcome" aria-labelledby="welcome-title">
+    <dialog class="card" id="welcome" aria-labelledby="welcome-title" aria-describedby="name-help">
       <h2 id="welcome-title">Ready for your cosmic adventure?</h2>
-      <p class="welcome-copy" id="name-help">Enter your name to start. Your name stays on this page and is cleared when you reload, unless you choose to save your result to the public leaderboard.</p>
+      <p class="welcome-copy" id="name-help">Enter your name and email to start your cosmic adventure. Both fields are required.</p>
       <form id="start-form">
         <label class="name-label" for="player-name">Your name</label>
-        <input class="name-input" id="player-name" name="player-name" type="text" autocomplete="given-name" maxlength="80" required aria-describedby="name-help">
+        <input class="name-input" id="player-name" name="player-name" type="text" autocomplete="name" maxlength="80" required aria-describedby="name-help" autofocus>
+        <label class="name-label" for="player-email">Your email</label>
+        <input class="name-input" id="player-email" name="player-email" type="email" autocomplete="email" maxlength="254" required aria-describedby="name-help">
         <div class="card-footer">
           <button class="next" type="submit">Start quiz <span aria-hidden="true">→</span></button>
         </div>
       </form>
-    </section>
+    </dialog>
     <p class="player-name" id="player-greeting" hidden></p>
     <div class="telemetry" id="mission-control" role="group" aria-label="Mission control" hidden>
       <div class="telemetry-heading"><span>Mission control</span><span class="telemetry-status"><span class="mission-time">T+ <span id="timer" role="timer" aria-label="Mission time">00:00</span></span><span class="telemetry-indicator" aria-hidden="true"></span></span></div>
@@ -189,7 +195,7 @@
       </div>
       <div class="mission-log" role="group" aria-labelledby="mission-log-title">
         <h3 id="mission-log-title" tabindex="-1">Mission log</h3>
-        <p id="save-help">Add your name, score, and time to the public Cosmic Quest leaderboard. Nothing is sent unless you choose to save.</p>
+        <p id="save-help">Save your name, email, score, and time to the mission log. Nothing is sent unless you choose to save.</p>
         <button class="next" id="save-score" type="button" aria-describedby="save-help">Save to leaderboard <span aria-hidden="true">↑</span></button>
         <p class="leaderboard-status" id="save-status" role="status"></p>
         <ol class="leaderboard" id="leaderboard" aria-label="Top explorers" hidden></ol>
@@ -220,7 +226,7 @@
     let current = 0, score = 0, answered = false, streak = 0, bestStreak = 0;
     let attemptOrder = [...questions];
     let startTime = 0, timerId = null;
-    let playerName = "", shuffled = false;
+    let playerName = "", playerEmail = "", shuffled = false;
     const SCORE_API = "https://space-quiz-dxb7dmfrb2hmcfbx.australiaeast-01.azurewebsites.net/api/scores";
     let finalTimeMs = 0;
 
@@ -229,7 +235,7 @@
       if (button.disabled) return;
       button.disabled = true;
       status.textContent = "Saving your mission…";
-      const record = { name: playerName, score, total: questions.length, timeMs: Math.round(finalTimeMs), mode: shuffled ? "shuffled" : "ordered" };
+      const record = { name: playerName, email: playerEmail, score, total: questions.length, timeMs: Math.round(finalTimeMs), mode: shuffled ? "shuffled" : "ordered" };
       try {
         // text/plain keeps this a CORS "simple" request, so no preflight is needed.
         const response = await fetch(SCORE_API, { method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" }, body: JSON.stringify(record) });
@@ -427,17 +433,19 @@
     });
     $("start-form").addEventListener("submit", event => {
       event.preventDefault();
-      if ($("welcome").hidden) return;
-      const name = $("player-name").value.trim();
+      if (!$("welcome").open) return;
+      const name = $("player-name").value.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").trim();
       if (!name) {
         $("player-name").setCustomValidity("Please enter your name to start the quiz.");
         $("player-name").reportValidity();
         return;
       }
+      if (!$("start-form").reportValidity()) return;
       playerName = name;
+      playerEmail = $("player-email").value.trim();
       $("player-greeting").textContent = `Explorer: ${name}`;
       $("player-greeting").hidden = false;
-      $("welcome").hidden = true;
+      $("welcome").close();
       $("mission-control").hidden = false;
       restart();
     });
@@ -465,6 +473,8 @@
       event.preventDefault();
       selectAnswer(selected);
     });
+    $("welcome").addEventListener("cancel", event => event.preventDefault());
+    $("welcome").showModal();
   </script>
 </body>
 </html>

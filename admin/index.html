@@ -68,6 +68,7 @@
     th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
     th { background: var(--surface); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
     td.name { white-space: normal; overflow-wrap: anywhere; min-width: 120px; }
+    .email-toggle { max-width: 260px; white-space: normal; overflow-wrap: anywhere; text-align: left; font-weight: 400; }
     td.num, th.num { text-align: right; }
     tbody tr:last-child td { border-bottom: 0; }
     tr.new td { background: var(--green-bg); }
@@ -113,7 +114,7 @@
       <div class="table-wrap" tabindex="0" role="region" aria-label="Scoreboard, highest score then fastest quiz time">
         <table>
           <thead>
-            <tr><th scope="col">Submitted</th><th scope="col">Name</th><th scope="col" class="num">Score</th><th scope="col" class="num">Time</th><th scope="col">Order</th></tr>
+            <tr><th scope="col">Submitted</th><th scope="col">Name</th><th scope="col">Email</th><th scope="col" class="num">Score</th><th scope="col" class="num">Time</th><th scope="col">Order</th></tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
@@ -125,7 +126,7 @@
     <h2 id="gate-title">Mission Control access</h2>
     <form class="gate-form" id="gate-form">
       <label for="gate-password">Password</label>
-      <input type="password" id="gate-password" autocomplete="off" spellcheck="false" required aria-describedby="gate-error">
+      <input type="password" id="gate-password" autocomplete="off" spellcheck="false" maxlength="256" required aria-describedby="gate-error">
       <p class="gate-error error" id="gate-error" aria-live="assertive"></p>
       <button type="submit" class="btn btn-primary">Unlock</button>
     </form>
@@ -133,8 +134,6 @@
 
   <script>
     const ADMIN_API = "https://space-quiz-dxb7dmfrb2hmcfbx.australiaeast-01.azurewebsites.net/api/scores/all";
-    // SHA-256 of the admin password. This is only a casual gate: the page is static and the API is public.
-    const PASSWORD_SHA256 = "7db2a4aae0c33015a69abaaeb04224c16e2a91aefa143c6056c49772699b9a84";
     const REFRESH_MS = 10000;
     const NEW_HIGHLIGHT_MS = 60000;
     const $ = id => document.getElementById(id);
@@ -143,6 +142,7 @@
     let timer = null;
     let loading = false;
     let unlocked = false;
+    let adminPassword = "";
 
     const formatTime = ms => {
       const total = Math.round(ms / 1000);
@@ -180,7 +180,7 @@
       body.replaceChildren();
       if (!entries.length) {
         const cell = body.insertRow().insertCell();
-        cell.colSpan = 5;
+        cell.colSpan = 6;
         cell.className = "empty";
         cell.textContent = "No scores have been submitted yet.";
       }
@@ -209,6 +209,24 @@
         const name = row.insertCell();
         name.className = "name";
         name.textContent = e.name;
+        const email = row.insertCell();
+        if (typeof e.email === "string" && e.email) {
+          const toggle = document.createElement("button");
+          toggle.type = "button";
+          toggle.className = "btn email-toggle";
+          toggle.textContent = "•••••• (show email)";
+          toggle.setAttribute("aria-pressed", "false");
+          toggle.setAttribute("aria-label", `Show email for ${e.name}`);
+          toggle.addEventListener("click", () => {
+            const revealed = toggle.getAttribute("aria-pressed") !== "true";
+            toggle.setAttribute("aria-pressed", String(revealed));
+            toggle.textContent = revealed ? e.email : "•••••• (show email)";
+            toggle.setAttribute("aria-label", revealed ? `Hide email: ${e.email}` : `Show email for ${e.name}`);
+          });
+          email.append(toggle);
+        } else {
+          email.textContent = "Not provided";
+        }
         const score = row.insertCell();
         score.className = "num mono";
         score.textContent = `${e.score}/${e.total}`;
@@ -220,57 +238,79 @@
       return newCount;
     }
 
-    async function loadScores() {
-      if (!unlocked || loading) return;
+    function lockDashboard(message) {
+      unlocked = false;
+      adminPassword = "";
+      scheduleRefresh();
+      $("dashboard").hidden = true;
+      $("rows").replaceChildren();
+      ["stat-total", "stat-average", "stat-perfect", "stat-fastest"].forEach(id => $(id).textContent = "—");
+      firstSeen = null;
+      $("gate-error").textContent = message;
+      $("gate-password").value = "";
+      if (!$("gate").open) $("gate").showModal();
+      $("gate-password").focus();
+    }
+
+    async function loadScores(password = adminPassword) {
+      if (typeof password !== "string" || !password || loading) return;
       loading = true;
       $("refresh").disabled = true;
+      const unlocking = !unlocked;
       try {
-        const response = await fetch(ADMIN_API, { cache: "no-store" });
+        const response = await fetch(ADMIN_API, { cache: "no-store", headers: { "X-Admin-Password": password } });
         const data = await response.json().catch(() => null);
+        if (response.status === 401 || response.status === 403) {
+          lockDashboard("Incorrect password. Try again.");
+          return;
+        }
         if (!response.ok || !data) throw new Error(data?.error || `The API responded with ${response.status}.`);
 
         renderStats(data);
         const newCount = renderRows(data.entries);
+        if (unlocking) {
+          adminPassword = password;
+          unlocked = true;
+          $("gate-password").value = "";
+          $("gate-error").textContent = "";
+          $("gate").close();
+          $("dashboard").hidden = false;
+          $("dashboard-title").focus();
+          scheduleRefresh();
+        }
         const fresh = newCount ? ` ${newCount} new submission${newCount === 1 ? "" : "s"}.` : "";
         const shown = data.entries.length < data.total ? ` Showing the top ${data.entries.length}.` : "";
         setStatus(`Updated ${new Date().toLocaleTimeString()}.${fresh}${shown}`);
       } catch (error) {
-        setStatus(`Could not load scores (${error.message || "the API is unreachable"}). Retrying on the next refresh.`, true);
+        const message = `Could not load scores (${error.message || "the API is unreachable"}).`;
+        if (unlocking) $("gate-error").textContent = `${message} Please try again.`;
+        else setStatus(`${message} Retrying on the next refresh.`, true);
       } finally {
         loading = false;
         $("refresh").disabled = false;
       }
     }
 
-    $("refresh").addEventListener("click", loadScores);
+    $("refresh").addEventListener("click", () => loadScores());
     $("auto-refresh").addEventListener("change", scheduleRefresh);
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden && $("auto-refresh").checked) loadScores();
       scheduleRefresh();
     });
 
-    async function sha256(text) {
-      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-      return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
-    }
-
     $("gate").addEventListener("cancel", event => event.preventDefault());
     $("gate-form").addEventListener("submit", async event => {
       event.preventDefault();
       const input = $("gate-password");
-      if (await sha256(input.value) !== PASSWORD_SHA256) {
-        $("gate-error").textContent = "Incorrect password. Try again.";
-        input.select();
-        return;
+      if (loading) return;
+      const button = $("gate-form").querySelector("button[type=submit]");
+      button.disabled = true;
+      $("gate-error").textContent = "Checking access…";
+      try {
+        await loadScores(input.value);
+      } finally {
+        button.disabled = false;
       }
-      unlocked = true;
-      input.value = "";
-      $("gate").close();
-      $("dashboard").hidden = false;
-      $("dashboard-title").focus();
-      setStatus("Loading scores…");
-      loadScores();
-      scheduleRefresh();
     });
 
     $("gate").showModal();
