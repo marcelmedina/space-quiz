@@ -73,6 +73,14 @@
     tr.new td { background: var(--green-bg); }
     .badge { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; color: var(--text); border: 1px solid var(--green); font-size: 11px; font-weight: 700; }
     .empty { padding: 18px; color: var(--muted); text-align: center; }
+    dialog { width: min(100% - 40px, 360px); padding: 24px; background: var(--card); color: var(--text); border: 1px solid var(--border); border-top: 2px solid var(--accent); border-radius: 14px; }
+    dialog::backdrop { background: #0b0e18d9; }
+    dialog h2 { margin-bottom: 14px; }
+    .gate-form { display: grid; gap: 10px; }
+    .gate-form label { font-size: 13px; font-weight: 600; }
+    .gate-form input { width: 100%; padding: 9px 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
+    .gate-error { min-height: 1.5em; margin: 0; font-size: 13px; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; }
     }
@@ -86,9 +94,9 @@
       <p class="subtitle">Live feed of every score saved through the leaderboard API. <a href="../index.html">Back to the quiz</a></p>
     </header>
 
-    <section class="card" id="dashboard" aria-labelledby="dashboard-title">
+    <section class="card" id="dashboard" aria-labelledby="dashboard-title" hidden>
       <div class="toolbar">
-        <h2 id="dashboard-title">Submissions</h2>
+        <h2 id="dashboard-title" tabindex="-1">Submissions</h2>
         <div class="toolbar-actions">
           <span class="live" id="live"><span class="live-dot" aria-hidden="true"></span><span id="live-text">Paused</span></span>
           <label class="toggle"><input type="checkbox" id="auto-refresh" checked> Auto-refresh (10s)</label>
@@ -113,8 +121,20 @@
     </section>
   </main>
 
+  <dialog id="gate" aria-labelledby="gate-title">
+    <h2 id="gate-title">Mission Control access</h2>
+    <form class="gate-form" id="gate-form">
+      <label for="gate-password">Password</label>
+      <input type="password" id="gate-password" autocomplete="off" spellcheck="false" required aria-describedby="gate-error">
+      <p class="gate-error error" id="gate-error" aria-live="assertive"></p>
+      <button type="submit" class="btn btn-primary">Unlock</button>
+    </form>
+  </dialog>
+
   <script>
     const ADMIN_API = "https://space-quiz-dxb7dmfrb2hmcfbx.australiaeast-01.azurewebsites.net/api/scores/all";
+    // SHA-256 of the admin password. This is only a casual gate: the page is static and the API is public.
+    const PASSWORD_SHA256 = "7db2a4aae0c33015a69abaaeb04224c16e2a91aefa143c6056c49772699b9a84";
     const REFRESH_MS = 10000;
     const NEW_HIGHLIGHT_MS = 60000;
     const $ = id => document.getElementById(id);
@@ -122,6 +142,7 @@
     let firstSeen = null;
     let timer = null;
     let loading = false;
+    let unlocked = false;
 
     const formatTime = ms => {
       const total = Math.round(ms / 1000);
@@ -136,7 +157,7 @@
 
     function scheduleRefresh() {
       clearInterval(timer);
-      timer = $("auto-refresh").checked && !document.hidden ? setInterval(loadScores, REFRESH_MS) : null;
+      timer = unlocked && $("auto-refresh").checked && !document.hidden ? setInterval(loadScores, REFRESH_MS) : null;
       $("live").classList.toggle("on", !!timer);
       $("live-text").textContent = timer ? "Live" : "Paused";
     }
@@ -198,7 +219,7 @@
     }
 
     async function loadScores() {
-      if (loading) return;
+      if (!unlocked || loading) return;
       loading = true;
       $("refresh").disabled = true;
       try {
@@ -226,9 +247,31 @@
       scheduleRefresh();
     });
 
-    setStatus("Loading scores…");
-    loadScores();
-    scheduleRefresh();
+    async function sha256(text) {
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    $("gate").addEventListener("cancel", event => event.preventDefault());
+    $("gate-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const input = $("gate-password");
+      if (await sha256(input.value) !== PASSWORD_SHA256) {
+        $("gate-error").textContent = "Incorrect password. Try again.";
+        input.select();
+        return;
+      }
+      unlocked = true;
+      input.value = "";
+      $("gate").close();
+      $("dashboard").hidden = false;
+      $("dashboard-title").focus();
+      setStatus("Loading scores…");
+      loadScores();
+      scheduleRefresh();
+    });
+
+    $("gate").showModal();
   </script>
 </body>
 </html>

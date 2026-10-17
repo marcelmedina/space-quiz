@@ -48,7 +48,7 @@ Entries are stored in Azure Table Storage (table `scores`) in the Function App's
 
 ### Admin dashboard
 
-Open [`/admin/`](https://marcelmedina.github.io/space-quiz/admin/) (or `admin/index.html` locally) to watch every submitted score. The page is public and read-only; scores are only ever written by the quiz's **Save to leaderboard** action. It refreshes automatically every 10 seconds (pausing while the tab is hidden), highlights new submissions, and offers a manual **Refresh now** button.
+Open [`/admin/`](https://marcelmedina.github.io/space-quiz/admin/) (or `admin/index.html` locally) to watch every submitted score. The page opens with a password prompt; the password's SHA-256 hash is hard-coded in the page, so this is only a casual gate and the underlying API stays public and read-only. Scores are only ever written by the quiz's **Save to leaderboard** action. Once unlocked, the page refreshes automatically every 10 seconds (pausing while the tab is hidden), highlights new submissions, and offers a manual **Refresh now** button.
 
 To run the API locally, start [Azurite](https://learn.microsoft.com/azure/storage/common/storage-use-azurite) and then:
 
