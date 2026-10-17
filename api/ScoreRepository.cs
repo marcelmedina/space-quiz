@@ -38,13 +38,18 @@ public sealed class ScoreRepository(TableClient table)
         await table.AddEntityAsync(entity, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<ScoreEntity>> GetTopAsync(int count, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ScoreEntity>> GetAllAsync(CancellationToken cancellationToken)
     {
         await EnsureTableAsync(cancellationToken);
         var entries = new List<ScoreEntity>();
         await foreach (var entity in table.QueryAsync<ScoreEntity>(e => e.PartitionKey == Partition, cancellationToken: cancellationToken))
             entries.Add(entity);
+        return entries;
+    }
 
+    public async Task<IReadOnlyList<ScoreEntity>> GetTopAsync(int count, CancellationToken cancellationToken)
+    {
+        var entries = await GetAllAsync(cancellationToken);
         return entries
             .OrderByDescending(e => e.Score)
             .ThenBy(e => e.TimeMs)

@@ -13,7 +13,7 @@ Use browser-level smoke checks for changes:
 
 ## Architecture and state
 
-The complete front end lives in `index.html`: inline CSS, semantic quiz/results markup, and a classic inline script after the markup. Keep front-end changes self-contained in this file. The leaderboard backend is the .NET 10 Azure Functions project in `api/`.
+The complete quiz front end lives in `index.html`: inline CSS, semantic quiz/results markup, and a classic inline script after the markup. Keep quiz changes self-contained in this file. The separate admin dashboard lives in `admin/index.html` (also self-contained, copied to `_site/admin/` by the Pages workflow). The leaderboard backend is the .NET 10 Azure Functions project in `api/`.
 
 The `questions` array contains 10 entries with `category`, `icon`, `question`, four `answers`, a zero-based `correct` index, and an explanatory `fact`. Questions and choices remain in their defined order.
 
@@ -32,6 +32,8 @@ Question-count assumptions span the data, copy, progressbar maximum, ten-segment
 In `index.html`, `saveScore()` posts the result as a `text/plain` JSON body (a CORS simple request) when the user chooses "Save to leaderboard", disables the button after a successful save, and moves focus to the mission log heading. `resetSaveScore()` re-enables saving for each completed attempt. `loadLeaderboard()` renders the top 10 with `textContent`.
 
 For local API work, run Azurite and `func start` in `api/` (see `local.settings.json`), and point `SCORE_API` at `http://localhost:7071/api/scores` temporarily.
+
+`AdminScoresFunction` exposes an anonymous, read-only `GET /api/scores/all` (the `admin` route prefix is reserved by the Functions host) that returns `{ total, generatedAt, entries }`, newest first, capped by `?limit=` (default 200, max 1000). The quiz's `POST /api/scores` is the only write path. `admin/index.html` opens a modal `<dialog>` password prompt (Escape cannot dismiss it) and compares the input's SHA-256 against the hard-coded `PASSWORD_SHA256`; only then does it reveal the dashboard and start polling `ADMIN_API` every 10 seconds while the tab is visible. It highlights new rows and renders entries with `textContent`. The gate is cosmetic; do not treat it as security.
 
 ## UI and accessibility conventions
 
