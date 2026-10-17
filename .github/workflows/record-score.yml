@@ -64,6 +64,7 @@ jobs:
               const entry = JSON.parse(process.env.ENTRY);
               const scores = JSON.parse(fs.readFileSync("scores.json", "utf8"));
               if (scores.some(e => e.issue === entry.issue)) { console.log("duplicate"); process.exit(); }
+              if (scores.some(e => e.submittedBy.toLowerCase() === entry.submittedBy.toLowerCase())) { console.log("repeat"); process.exit(); }
               scores.push(entry);
               scores.sort((a, b) => b.score - a.score || a.timeMs - b.timeMs || a.date.localeCompare(b.date));
               fs.writeFileSync("scores.json", JSON.stringify(scores, null, 2) + "\n");
@@ -72,6 +73,11 @@ jobs:
             if [ "$result" = "duplicate" ]; then
               echo "saved=false" >> "$GITHUB_OUTPUT"
               echo "error=This issue was already recorded." >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$result" = "repeat" ]; then
+              echo "saved=false" >> "$GITHUB_OUTPUT"
+              echo "error=Only your first submitted attempt counts, and this GitHub account already has a score on the leaderboard." >> "$GITHUB_OUTPUT"
               exit 0
             fi
             git add scores.json

@@ -36,7 +36,7 @@ Each question accepts one answer. Progress advances when an answer is selected; 
 
 The results screen offers **Save to leaderboard**, which opens a prefilled GitHub issue titled `[score] …` containing your name, score, mission time, and question order as JSON. Nothing is saved unless you submit that issue with your GitHub account.
 
-When a `[score]` issue is opened, [`.github/workflows/record-score.yml`](.github/workflows/record-score.yml) validates the data, appends it to [`scores.json`](scores.json) on `main`, comments, and closes the issue. The Pages workflow then redeploys so the online results screen shows the top 10 explorers by score, then fastest time. No tokens or secrets are embedded in the page. When opened from a local file, the quiz works fully and the leaderboard is simply not loaded.
+When a `[score]` issue is opened, [`.github/workflows/record-score.yml`](.github/workflows/record-score.yml) validates the data, appends it to [`scores.json`](scores.json) on `main`, comments, and closes the issue. Only the first submission from each GitHub account is accepted; later ones are closed with an explanation. The Pages workflow then redeploys so the online results screen shows the top 10 explorers by score, then fastest time. No tokens or secrets are embedded in the page. When opened from a local file, the quiz works fully and the leaderboard is simply not loaded.
 
 ## Development
 
