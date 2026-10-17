@@ -18,6 +18,7 @@ Start-Process .\index.html
 - Live score, segmented progress bar, and completion percentage.
 - Green feedback for correct answers and a red shake for incorrect selections.
 - Results with an emoji reaction, accuracy, best streak, and replay.
+- Optional 1–4 keyboard shortcuts for selecting answers.
 - A centered, responsive layout with automatic light and dark themes.
 - Native buttons, visible keyboard focus, accessible status updates, and reduced-motion support.
 

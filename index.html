@@ -59,6 +59,10 @@
     .question-heading { display: flex; gap: 9px; align-items: center; color: var(--accent); text-transform: uppercase; font-size: 10px; font-weight: 750; letter-spacing: 1.8px; }
     .question-heading span:first-child { font-size: 16px; line-height: 1; }
     h2 { font-size: 23px; line-height: 1.4; letter-spacing: -.5px; margin: 14px 0 23px; font-weight: 650; }
+    .shortcut-control { display: flex; align-items: center; gap: 9px; margin: 0 0 10px; color: var(--text); font-size: 13px; }
+    .shortcut-control input { width: 16px; height: 16px; flex: 0 0 auto; margin: 0; accent-color: var(--accent); }
+    .shortcut-control input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .shortcut-hint { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
     .answers { display: grid; gap: 11px; }
     .answer { width: 100%; min-height: 57px; display: flex; align-items: center; gap: 13px; text-align: left; padding: 11px 15px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 11px; cursor: pointer; transition: background .18s, border-color .18s, transform .18s; }
     .answer:not(:disabled):hover { background: var(--accent-bg); border-color: var(--accent); transform: translateX(3px); }
@@ -131,6 +135,8 @@
       <div id="question-content">
         <div class="question-heading"><span id="category-icon" aria-hidden="true">🪐</span><span id="category"></span></div>
         <h2 id="question" tabindex="-1"></h2>
+        <label class="shortcut-control"><input id="shortcuts-enabled" type="checkbox" aria-controls="answers shortcut-hint"> Enable number-key shortcuts</label>
+        <p class="shortcut-hint" id="shortcut-hint" hidden>Press 1-4 to choose the matching answer.</p>
         <div class="answers" id="answers" role="group" aria-labelledby="question"></div>
       </div>
       <div id="feedback" class="feedback" role="status" aria-live="polite" hidden></div>
@@ -202,7 +208,7 @@
         const letter = document.createElement("span");
         letter.className = "letter";
         letter.setAttribute("aria-hidden", "true");
-        letter.textContent = String.fromCharCode(65 + index);
+        letter.textContent = $("shortcuts-enabled").checked ? String(index + 1) : String.fromCharCode(65 + index);
         const label = document.createElement("span");
         label.textContent = answer;
         button.append(letter, label);
@@ -274,6 +280,27 @@
       $("quiz").hidden = false;
       updateProgress(0);
       renderQuestion(true);
+    });
+    $("shortcuts-enabled").addEventListener("change", () => {
+      const enabled = $("shortcuts-enabled").checked;
+      $("shortcut-hint").hidden = !enabled;
+      [...$("answers").children].forEach((button, index) => {
+        if (button.classList.contains("correct") || button.classList.contains("wrong")) return;
+        button.querySelector(".letter").textContent = enabled ? String(index + 1) : String.fromCharCode(65 + index);
+      });
+    });
+    document.addEventListener("keydown", event => {
+      if (!$("shortcuts-enabled").checked || event.defaultPrevented || event.repeat || event.isComposing ||
+        event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || !/^[1-4]$/.test(event.key) ||
+        $("quiz").hidden || $("results").hidden === false || answered) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable ||
+        target.matches("input:not([type=checkbox]):not([type=radio]), textarea, select"))) return;
+      const selected = Number(event.key) - 1;
+      const button = $("answers").children[selected];
+      if (!button || button.disabled) return;
+      event.preventDefault();
+      selectAnswer(selected);
     });
     renderQuestion();
   </script>
