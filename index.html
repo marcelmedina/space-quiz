@@ -102,7 +102,20 @@
     .stat { border-radius: 11px; background: var(--surface); padding: 13px; color: var(--muted); font-size: 12px; }
     .stat strong { display: block; font-size: 21px; color: var(--text); }
     .replay-actions { display: grid; gap: 11px; }
+    .mission-log { margin: 0 0 25px; padding: 18px; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; }
+    .mission-log h3 { margin: 0 0 6px; font-size: 16px; }
+    .results .mission-log p { margin: 0 0 14px; color: var(--text); font-size: 13px; }
+    a.next { text-decoration: none; text-align: center; }
+    a.next:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    .leaderboard { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+    .leaderboard li { display: grid; grid-template-columns: 2.2em 1fr auto auto; gap: 10px; align-items: center; padding: 7px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 7px; }
+    .leaderboard .rank, .leaderboard .lb-score, .leaderboard .lb-time { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .leaderboard .rank { color: var(--accent); font-weight: 650; }
+    .leaderboard .lb-name { overflow-wrap: anywhere; }
+    .leaderboard .lb-handle { display: block; color: var(--text); opacity: .8; font-size: 11px; }
+    .results .mission-log .leaderboard-status { margin: 12px 0 0; color: var(--text); font-size: 12px; }
     [hidden] { display: none !important; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
     .enter { animation: appear .3s ease both; }
     @keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
@@ -131,7 +144,7 @@
     </header>
     <section class="card" id="welcome" aria-labelledby="welcome-title">
       <h2 id="welcome-title">Ready for your cosmic adventure?</h2>
-      <p class="welcome-copy" id="name-help">Enter your name to start. Your name stays on this page and is cleared when you reload.</p>
+      <p class="welcome-copy" id="name-help">Enter your name to start. Your name stays on this page and is cleared when you reload, unless you choose to save your result to the public leaderboard.</p>
       <form id="start-form">
         <label class="name-label" for="player-name">Your name</label>
         <input class="name-input" id="player-name" name="player-name" type="text" autocomplete="given-name" maxlength="80" required aria-describedby="name-help">
@@ -176,6 +189,13 @@
         <div class="stat"><strong id="best-streak"></strong>Best streak</div>
         <div class="stat"><strong id="total-time"></strong>Time</div>
       </div>
+      <div class="mission-log" role="group" aria-labelledby="mission-log-title">
+        <h3 id="mission-log-title">Mission log</h3>
+        <p id="save-help">Add your name, score, and time to the public leaderboard stored in this project's GitHub repository. Submitting the prefilled GitHub issue (GitHub account required) records it automatically. Only your first saved attempt per GitHub account counts.</p>
+        <a class="next" id="save-score" href="https://github.com/marcelmedina/space-quiz/issues/new" target="_blank" rel="noopener" aria-describedby="save-help">Save to leaderboard <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens GitHub in a new tab)</span></a>
+        <ol class="leaderboard" id="leaderboard" aria-label="Top explorers" hidden></ol>
+        <p class="leaderboard-status" id="leaderboard-status" role="status"></p>
+      </div>
       <div class="replay-actions">
         <button class="next" id="restart">Explore again <span aria-hidden="true">↻</span></button>
         <button class="next" id="restart-shuffled">Play shuffled <span aria-hidden="true">⤨</span></button>
@@ -201,6 +221,63 @@
     let current = 0, score = 0, answered = false, streak = 0, bestStreak = 0;
     let attemptOrder = [...questions];
     let startTime = 0, timerId = null;
+    let playerName = "", shuffled = false;
+    const SCORE_REPO = "marcelmedina/space-quiz";
+    const SCORE_TITLE_PREFIX = "[score]";
+
+    function scoreIssueUrl(elapsed) {
+      const record = { name: playerName, score, total: questions.length, timeMs: Math.round(elapsed), mode: shuffled ? "shuffled" : "ordered" };
+      const body = [
+        "Submit this issue to save your quiz result to the Cosmic Quest leaderboard.",
+        "A GitHub Action records it in `scores.json` and closes this issue. Please don't edit the data below.",
+        "",
+        "```json",
+        JSON.stringify(record),
+        "```"
+      ].join("\n");
+      const params = new URLSearchParams({ title: `${SCORE_TITLE_PREFIX} ${playerName} — ${score}/${questions.length} in ${describeTime(elapsed)}`, body });
+      return `https://github.com/${SCORE_REPO}/issues/new?${params}`;
+    }
+    async function loadLeaderboard() {
+      const list = $("leaderboard"), status = $("leaderboard-status");
+      list.hidden = true;
+      if (!/^https?:$/.test(location.protocol)) {
+        status.textContent = "The leaderboard appears on the online version of the quiz.";
+        return;
+      }
+      status.textContent = "Loading leaderboard…";
+      try {
+        const response = await fetch("scores.json", { cache: "no-store" });
+        if (!response.ok) throw new Error(response.statusText);
+        const entries = (await response.json())
+          .filter(e => e && typeof e.name === "string" && Number.isInteger(e.score) && Number.isFinite(e.timeMs))
+          .sort((a, b) => b.score - a.score || a.timeMs - b.timeMs)
+          .slice(0, 10);
+        if (!entries.length) { status.textContent = "No saved missions yet — be the first explorer on the board!"; return; }
+        list.replaceChildren(...entries.map((entry, index) => {
+          const item = document.createElement("li");
+          const cells = [["rank", `#${index + 1}`], ["lb-name", entry.name], ["lb-score", `${entry.score}/${entry.total || questions.length}`], ["lb-time", describeTime(entry.timeMs)]];
+          const spans = cells.map(([className, text]) => {
+            const span = document.createElement("span");
+            span.className = className;
+            span.textContent = text;
+            return span;
+          });
+          if (typeof entry.submittedBy === "string") {
+            const handle = document.createElement("small");
+            handle.className = "lb-handle";
+            handle.textContent = `@${entry.submittedBy}`;
+            spans[1].append(handle);
+          }
+          item.append(...spans);
+          return item;
+        }));
+        list.hidden = false;
+        status.textContent = "Top explorers by score, then fastest time. New entries appear a minute or two after submission.";
+      } catch {
+        status.textContent = "The leaderboard couldn't be loaded right now.";
+      }
+    }
 
     function formatTime(ms) {
       const total = Math.floor(ms / 1000);
@@ -320,10 +397,12 @@
       $("accuracy").textContent = `${score * 10}%`;
       $("best-streak").textContent = bestStreak;
       $("total-time").textContent = describeTime(elapsed);
+      $("save-score").href = scoreIssueUrl(elapsed);
+      loadLeaderboard();
       $("result-title").focus();
     });
     function restart(shuffle = false) {
-      current = 0; score = 0; streak = 0; bestStreak = 0;
+      current = 0; score = 0; streak = 0; bestStreak = 0; shuffled = shuffle;
       attemptOrder = [...questions];
       if (shuffle) {
         for (let i = attemptOrder.length - 1; i > 0; i--) {
@@ -350,6 +429,7 @@
         $("player-name").reportValidity();
         return;
       }
+      playerName = name;
       $("player-greeting").textContent = `Explorer: ${name}`;
       $("player-greeting").hidden = false;
       $("welcome").hidden = true;
