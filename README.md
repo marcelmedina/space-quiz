@@ -42,13 +42,13 @@ The API is a .NET 10 Azure Functions app in [`api/`](api/), deployed to the `spa
 | --- | --- | --- |
 | `POST` | `/api/scores` | Validates and records `{ "name", "score", "timeMs", "mode" }`. Returns `201` with the stored entry, or `400` with `{ "error" }`. |
 | `GET` | `/api/scores` | Returns the top 10 entries. |
-| `GET` | `/api/scores/all` | Read-only admin feed. Returns `{ "total", "generatedAt", "entries" }` with the latest submissions first (`?limit=`, default 200, max 1000). |
+| `GET` | `/api/scores/all` | Read-only admin feed. Returns `{ "total", "generatedAt", "entries" }` ranked by highest score, then shortest quiz time, then earliest submission, before applying `?limit=` (default 200, max 1000). |
 
 Entries are stored in Azure Table Storage (table `scores`) in the Function App's `AzureWebJobsStorage` account.
 
 ### Admin dashboard
 
-Open [`/admin/`](https://marcelmedina.github.io/space-quiz/admin/) (or `admin/index.html` locally) to watch every submitted score. The page opens with a password prompt; the password's SHA-256 hash is hard-coded in the page, so this is only a casual gate and the underlying API stays public and read-only. Scores are only ever written by the quiz's **Save to leaderboard** action. Once unlocked, the page refreshes automatically every 10 seconds (pausing while the tab is hidden), highlights new submissions, and offers a manual **Refresh now** button.
+Open [`/admin/`](https://marcelmedina.github.io/space-quiz/admin/) (or `admin/index.html` locally) to watch the scoreboard. Higher scores always rank above lower scores; equal scores favor shorter quiz times (using full millisecond precision), and equal scores and times favor earlier submissions. The page opens with a password prompt; the password's SHA-256 hash is hard-coded in the page, so this is only a casual gate and the underlying API stays public and read-only. Scores are only ever written by the quiz's **Save to leaderboard** action. Once unlocked, the page refreshes automatically every 10 seconds (pausing while the tab is hidden), highlights new submissions, and offers a manual **Refresh now** button.
 
 To run the API locally, start [Azurite](https://learn.microsoft.com/azure/storage/common/storage-use-azurite) and then:
 

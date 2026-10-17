@@ -90,13 +90,13 @@
   <main>
     <header>
       <div class="brand">Cosmic Quest · Mission Control</div>
-      <h1>Score submissions</h1>
-      <p class="subtitle">Live feed of every score saved through the leaderboard API. <a href="../index.html">Back to the quiz</a></p>
+      <h1>Scoreboard</h1>
+      <p class="subtitle">Highest score first, then fastest quiz time. Equal scores and times favor the earlier submission. <a href="../index.html">Back to the quiz</a></p>
     </header>
 
     <section class="card" id="dashboard" aria-labelledby="dashboard-title" hidden>
       <div class="toolbar">
-        <h2 id="dashboard-title" tabindex="-1">Submissions</h2>
+        <h2 id="dashboard-title" tabindex="-1">Top submissions</h2>
         <div class="toolbar-actions">
           <span class="live" id="live"><span class="live-dot" aria-hidden="true"></span><span id="live-text">Paused</span></span>
           <label class="toggle"><input type="checkbox" id="auto-refresh" checked> Auto-refresh (10s)</label>
@@ -110,7 +110,7 @@
         <div class="stat"><span class="stat-label">Fastest perfect</span><span class="stat-value" id="stat-fastest">—</span></div>
       </div>
       <p class="status" id="status" role="status" aria-live="polite"></p>
-      <div class="table-wrap" tabindex="0" role="region" aria-label="Score submissions, newest first">
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Scoreboard, highest score then fastest quiz time">
         <table>
           <thead>
             <tr><th scope="col">Submitted</th><th scope="col">Name</th><th scope="col" class="num">Score</th><th scope="col" class="num">Time</th><th scope="col">Order</th></tr>
@@ -189,7 +189,9 @@
       firstSeen ??= new Map();
       const now = Date.now();
       let newCount = 0;
-      for (const e of entries) {
+      const ranked = [...entries].sort((a, b) =>
+        b.score - a.score || a.timeMs - b.timeMs || new Date(a.date) - new Date(b.date));
+      for (const e of ranked) {
         if (!firstSeen.has(e.id)) {
           firstSeen.set(e.id, initial ? 0 : now);
           if (!initial) newCount++;
@@ -230,7 +232,7 @@
         renderStats(data);
         const newCount = renderRows(data.entries);
         const fresh = newCount ? ` ${newCount} new submission${newCount === 1 ? "" : "s"}.` : "";
-        const shown = data.entries.length < data.total ? ` Showing the latest ${data.entries.length}.` : "";
+        const shown = data.entries.length < data.total ? ` Showing the top ${data.entries.length}.` : "";
         setStatus(`Updated ${new Date().toLocaleTimeString()}.${fresh}${shown}`);
       } catch (error) {
         setStatus(`Could not load scores (${error.message || "the API is unreachable"}). Retrying on the next refresh.`, true);
