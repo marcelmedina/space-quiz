@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "name": "MARCEL",
+    "score": 10,
+    "total": 10,
+    "timeMs": 104111,
+    "mode": "ordered",
+    "submittedBy": "marcelmedina",
+    "issue": 13,
+    "date": "2026-10-17T08:13:32Z"
+  }
+]
