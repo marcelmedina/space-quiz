@@ -105,15 +105,13 @@
     .mission-log { margin: 0 0 25px; padding: 18px; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; }
     .mission-log h3 { margin: 0 0 6px; font-size: 16px; }
     .results .mission-log p { margin: 0 0 14px; color: var(--text); font-size: 13px; }
-    a.next { text-decoration: none; text-align: center; }
-    a.next:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
     .leaderboard { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
     .leaderboard li { display: grid; grid-template-columns: 2.2em 1fr auto auto; gap: 10px; align-items: center; padding: 7px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 7px; }
     .leaderboard .rank, .leaderboard .lb-score, .leaderboard .lb-time { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; }
     .leaderboard .rank { color: var(--accent); font-weight: 650; }
     .leaderboard .lb-name { overflow-wrap: anywhere; }
-    .leaderboard .lb-handle { display: block; color: var(--text); opacity: .8; font-size: 11px; }
     .results .mission-log .leaderboard-status { margin: 12px 0 0; color: var(--text); font-size: 12px; }
+    .results .mission-log .leaderboard-status:empty { display: none; }
     [hidden] { display: none !important; }
     .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
     .enter { animation: appear .3s ease both; }
@@ -190,9 +188,10 @@
         <div class="stat"><strong id="total-time"></strong>Time</div>
       </div>
       <div class="mission-log" role="group" aria-labelledby="mission-log-title">
-        <h3 id="mission-log-title">Mission log</h3>
-        <p id="save-help">Add your name, score, and time to the public leaderboard stored in this project's GitHub repository. Submitting the prefilled GitHub issue (GitHub account required) records it automatically. Only your first saved attempt per GitHub account counts.</p>
-        <a class="next" id="save-score" href="https://github.com/marcelmedina/space-quiz/issues/new" target="_blank" rel="noopener" aria-describedby="save-help">Save to leaderboard <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens GitHub in a new tab)</span></a>
+        <h3 id="mission-log-title" tabindex="-1">Mission log</h3>
+        <p id="save-help">Add your name, score, and time to the public Cosmic Quest leaderboard. Nothing is sent unless you choose to save.</p>
+        <button class="next" id="save-score" type="button" aria-describedby="save-help">Save to leaderboard <span aria-hidden="true">↑</span></button>
+        <p class="leaderboard-status" id="save-status" role="status"></p>
         <ol class="leaderboard" id="leaderboard" aria-label="Top explorers" hidden></ol>
         <p class="leaderboard-status" id="leaderboard-status" role="status"></p>
       </div>
@@ -222,32 +221,43 @@
     let attemptOrder = [...questions];
     let startTime = 0, timerId = null;
     let playerName = "", shuffled = false;
-    const SCORE_REPO = "marcelmedina/space-quiz";
-    const SCORE_TITLE_PREFIX = "[score]";
+    const SCORE_API = "https://space-quiz-dxb7dmfrb2hmcfbx.australiaeast-01.azurewebsites.net/api/scores";
+    let finalTimeMs = 0;
 
-    function scoreIssueUrl(elapsed) {
-      const record = { name: playerName, score, total: questions.length, timeMs: Math.round(elapsed), mode: shuffled ? "shuffled" : "ordered" };
-      const body = [
-        "Submit this issue to save your quiz result to the Cosmic Quest leaderboard.",
-        "A GitHub Action records it in `scores.json` and closes this issue. Please don't edit the data below.",
-        "",
-        "```json",
-        JSON.stringify(record),
-        "```"
-      ].join("\n");
-      const params = new URLSearchParams({ title: `${SCORE_TITLE_PREFIX} ${playerName} — ${score}/${questions.length} in ${describeTime(elapsed)}`, body });
-      return `https://github.com/${SCORE_REPO}/issues/new?${params}`;
+    async function saveScore() {
+      const button = $("save-score"), status = $("save-status");
+      if (button.disabled) return;
+      button.disabled = true;
+      status.textContent = "Saving your mission…";
+      const record = { name: playerName, score, total: questions.length, timeMs: Math.round(finalTimeMs), mode: shuffled ? "shuffled" : "ordered" };
+      try {
+        // text/plain keeps this a CORS "simple" request, so no preflight is needed.
+        const response = await fetch(SCORE_API, { method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" }, body: JSON.stringify(record) });
+        if (!response.ok) {
+          const problem = await response.json().catch(() => null);
+          throw new Error(problem && typeof problem.error === "string" ? problem.error : "");
+        }
+        button.innerHTML = `Saved to leaderboard <span aria-hidden="true">✓</span>`;
+        status.textContent = "🚀 Your mission has been logged!";
+        $("mission-log-title").focus();
+        loadLeaderboard();
+      } catch (error) {
+        button.disabled = false;
+        button.focus();
+        status.textContent = `Your score couldn't be saved. ${error.message || "Please try again."}`;
+      }
+    }
+    function resetSaveScore() {
+      $("save-score").disabled = false;
+      $("save-score").innerHTML = `Save to leaderboard <span aria-hidden="true">↑</span>`;
+      $("save-status").textContent = "";
     }
     async function loadLeaderboard() {
       const list = $("leaderboard"), status = $("leaderboard-status");
       list.hidden = true;
-      if (!/^https?:$/.test(location.protocol)) {
-        status.textContent = "The leaderboard appears on the online version of the quiz.";
-        return;
-      }
       status.textContent = "Loading leaderboard…";
       try {
-        const response = await fetch("scores.json", { cache: "no-store" });
+        const response = await fetch(SCORE_API, { cache: "no-store" });
         if (!response.ok) throw new Error(response.statusText);
         const entries = (await response.json())
           .filter(e => e && typeof e.name === "string" && Number.isInteger(e.score) && Number.isFinite(e.timeMs))
@@ -263,17 +273,11 @@
             span.textContent = text;
             return span;
           });
-          if (typeof entry.submittedBy === "string") {
-            const handle = document.createElement("small");
-            handle.className = "lb-handle";
-            handle.textContent = `@${entry.submittedBy}`;
-            spans[1].append(handle);
-          }
           item.append(...spans);
           return item;
         }));
         list.hidden = false;
-        status.textContent = "Top explorers by score, then fastest time. New entries appear a minute or two after submission.";
+        status.textContent = "Top explorers by score, then fastest time.";
       } catch {
         status.textContent = "The leaderboard couldn't be loaded right now.";
       }
@@ -397,7 +401,8 @@
       $("accuracy").textContent = `${score * 10}%`;
       $("best-streak").textContent = bestStreak;
       $("total-time").textContent = describeTime(elapsed);
-      $("save-score").href = scoreIssueUrl(elapsed);
+      finalTimeMs = elapsed;
+      resetSaveScore();
       loadLeaderboard();
       $("result-title").focus();
     });
@@ -436,6 +441,7 @@
       $("mission-control").hidden = false;
       restart();
     });
+    $("save-score").addEventListener("click", saveScore);
     $("restart").addEventListener("click", () => restart());
     $("restart-shuffled").addEventListener("click", () => restart(true));
     $("shortcuts-enabled").addEventListener("change", () => {

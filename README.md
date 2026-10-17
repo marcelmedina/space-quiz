@@ -1,6 +1,6 @@
 # Cosmic Quest
 
-A space exploration quiz with 10 questions, colorful answer feedback, and a compact mission-control display. Built as a single, self-contained HTML file with no server or dependencies; the only network request is an optional leaderboard fetch on the hosted site.
+A space exploration quiz with 10 questions, colorful answer feedback, and a compact mission-control display. Built as a single, self-contained HTML file with no server or dependencies; the only network use is an optional leaderboard backed by an Azure Function.
 
 ## Play online
 
@@ -23,7 +23,7 @@ Start-Process .\index.html
 - Live score, segmented progress bar, and completion percentage.
 - Green feedback for correct answers and a red shake for incorrect selections.
 - Results with an emoji reaction, accuracy, best streak, total mission time, and original-order or shuffled replay.
-- An optional public leaderboard that saves your name, score, and mission time to `scores.json` in this repository.
+- An optional public leaderboard that saves your name, score, and mission time through an Azure Functions API.
 - Optional 1–4 keyboard shortcuts for selecting answers.
 - A centered, responsive layout with automatic light and dark themes.
 - Native buttons, visible keyboard focus, accessible status updates, and reduced-motion support.
@@ -34,13 +34,27 @@ Each question accepts one answer. Progress advances when an answer is selected; 
 
 ## Leaderboard
 
-The results screen offers **Save to leaderboard**, which opens a prefilled GitHub issue titled `[score] …` containing your name, score, mission time, and question order as JSON. Nothing is saved unless you submit that issue with your GitHub account.
+The results screen offers **Save to leaderboard**, which sends your name, score, mission time, and question order to the Cosmic Quest API. Nothing is saved unless you select it, and each completed attempt can be saved once. The results screen then shows the top 10 explorers by score, then fastest time. No keys or secrets are embedded in the page.
 
-When a `[score]` issue is opened, [`.github/workflows/record-score.yml`](.github/workflows/record-score.yml) validates the data, appends it to [`scores.json`](scores.json) on `main`, comments, and closes the issue. Only the first submission from each GitHub account is accepted; later ones are closed with an explanation. The Pages workflow then redeploys so the online results screen shows the top 10 explorers by score, then fastest time. No tokens or secrets are embedded in the page. When opened from a local file, the quiz works fully and the leaderboard is simply not loaded.
+The API is a .NET 10 Azure Functions app in [`api/`](api/), deployed to the `space-quiz` Function App by [`.github/workflows/main_space-quiz.yml`](.github/workflows/main_space-quiz.yml) on every push to `main`:
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `POST` | `/api/scores` | Validates and records `{ "name", "score", "timeMs", "mode" }`. Returns `201` with the stored entry, or `400` with `{ "error" }`. |
+| `GET` | `/api/scores` | Returns the top 10 entries. |
+
+Entries are stored in Azure Table Storage (table `scores`) in the Function App's `AzureWebJobsStorage` account.
+
+To run the API locally, start [Azurite](https://learn.microsoft.com/azure/storage/common/storage-use-azurite) and then:
+
+```powershell
+Set-Location api
+func start
+```
 
 ## Development
 
-All markup, styles, question data, and JavaScript are in `index.html`; leaderboard data lives in `scores.json`. Edit and reload the browser to see changes. There is no build step, configured linter, or automated test runner.
+All markup, styles, question data, and JavaScript are in `index.html`; the leaderboard API lives in `api/`. Edit and reload the browser to see changes. There is no build step, configured linter, or automated test runner.
 
 First check that an empty or whitespace-only name cannot start the quiz, then enter a name and start using Enter or the Start quiz button. The timer should start only after submission, and focus should move to the first question.
 
