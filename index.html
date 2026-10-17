@@ -91,6 +91,7 @@
     .result-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 25px 0; }
     .stat { border-radius: 11px; background: var(--surface); padding: 13px; color: var(--muted); font-size: 12px; }
     .stat strong { display: block; font-size: 21px; color: var(--text); }
+    .replay-actions { display: grid; gap: 11px; }
     [hidden] { display: none !important; }
     .enter { animation: appear .3s ease both; }
     @keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -150,7 +151,10 @@
         <div class="stat"><strong id="accuracy"></strong>Accuracy</div>
         <div class="stat"><strong id="best-streak"></strong>Best streak</div>
       </div>
-      <button class="next" id="restart">Explore again <span aria-hidden="true">↻</span></button>
+      <div class="replay-actions">
+        <button class="next" id="restart">Explore again <span aria-hidden="true">↻</span></button>
+        <button class="next" id="restart-shuffled">Play shuffled <span aria-hidden="true">⤨</span></button>
+      </div>
     </section>
     <div class="footer">Made for curious minds <span></span> No spacesuit required</div>
     <noscript><p>This quiz needs JavaScript enabled to launch.</p></noscript>
@@ -170,6 +174,7 @@
     ];
     const $ = id => document.getElementById(id);
     let current = 0, score = 0, answered = false, streak = 0, bestStreak = 0;
+    let attemptOrder = [...questions];
     const progress = document.querySelector(".progress");
     const progressFill = document.querySelector(".progress-fill");
 
@@ -190,7 +195,7 @@
 
     function renderQuestion(focus = false) {
       answered = false;
-      const q = questions[current];
+      const q = attemptOrder[current];
       $("question-count").innerHTML = `<strong>Question ${String(current + 1).padStart(2, "0")}</strong> / ${questions.length}`;
       $("category").textContent = q.category;
       $("category-icon").textContent = q.icon;
@@ -222,7 +227,7 @@
     function selectAnswer(selected) {
       if (answered) return;
       answered = true;
-      const q = questions[current];
+      const q = attemptOrder[current];
       const correct = selected === q.correct;
       if (correct) { score++; streak++; bestStreak = Math.max(streak, bestStreak); }
       else { streak = 0; }
@@ -267,14 +272,23 @@
       $("best-streak").textContent = bestStreak;
       $("result-title").focus();
     });
-    $("restart").addEventListener("click", () => {
+    function restart(shuffle = false) {
       current = 0; score = 0; streak = 0; bestStreak = 0;
+      attemptOrder = [...questions];
+      if (shuffle) {
+        for (let i = attemptOrder.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [attemptOrder[i], attemptOrder[j]] = [attemptOrder[j], attemptOrder[i]];
+        }
+      }
       $("score").textContent = "0 points";
       $("results").hidden = true;
       $("quiz").hidden = false;
       updateProgress(0);
       renderQuestion(true);
-    });
+    }
+    $("restart").addEventListener("click", () => restart());
+    $("restart-shuffled").addEventListener("click", () => restart(true));
     renderQuestion();
   </script>
 </body>
