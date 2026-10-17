@@ -1,0 +1,82 @@
+name: Record quiz score
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: record-score
+  cancel-in-progress: false
+
+jobs:
+  record:
+    if: startsWith(github.event.issue.title, '[score]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Validate and append score
+        id: record
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const issue = context.payload.issue;
+            const fail = reason => { core.setOutput("error", reason); core.setOutput("saved", "false"); };
+            const match = /```json\s*([\s\S]*?)```/.exec(issue.body || "");
+            if (!match) return fail("No score data block was found.");
+            let data;
+            try { data = JSON.parse(match[1]); } catch { return fail("The score data is not valid JSON."); }
+            const name = typeof data.name === "string" ? data.name.replace(/[\u0000-\u001f\u007f]/g, "").trim() : "";
+            const total = 10;
+            if (!name || name.length > 80) return fail("The name must be 1-80 characters.");
+            if (!Number.isInteger(data.score) || data.score < 0 || data.score > total) return fail(`The score must be a whole number from 0 to ${total}.`);
+            if (!Number.isFinite(data.timeMs) || data.timeMs < 1000 || data.timeMs > 86400000) return fail("The time must be between 1 second and 24 hours.");
+            const mode = data.mode === "shuffled" ? "shuffled" : "ordered";
+            const scores = JSON.parse(fs.readFileSync("scores.json", "utf8"));
+            if (scores.some(entry => entry.issue === issue.number)) return fail("This issue was already recorded.");
+            scores.push({
+              name,
+              score: data.score,
+              total,
+              timeMs: Math.round(data.timeMs),
+              mode,
+              submittedBy: issue.user.login,
+              issue: issue.number,
+              date: issue.created_at
+            });
+            scores.sort((a, b) => b.score - a.score || a.timeMs - b.timeMs || a.date.localeCompare(b.date));
+            fs.writeFileSync("scores.json", JSON.stringify(scores, null, 2) + "\n");
+            core.setOutput("saved", "true");
+
+      - name: Commit scores.json
+        if: steps.record.outputs.saved == 'true'
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scores.json
+          git commit -m "Record quiz score from #${ISSUE_NUMBER}"
+          git push
+
+      - name: Reply and close issue
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          SAVED: ${{ steps.record.outputs.saved }}
+          ERROR: ${{ steps.record.outputs.error }}
+        with:
+          script: |
+            const saved = process.env.SAVED === "true";
+            const body = saved
+              ? "🚀 Your mission has been logged! The leaderboard updates once GitHub Pages redeploys (usually within a couple of minutes)."
+              : `⚠️ This score couldn't be recorded: ${process.env.ERROR || "an unexpected error occurred."}`;
+            await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            await github.rest.issues.update({ ...context.repo, issue_number: context.issue.number, state: "closed", state_reason: saved ? "completed" : "not_planned" });
