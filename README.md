@@ -2,6 +2,10 @@
 
 A space exploration quiz with 10 questions, colorful answer feedback, and a compact mission-control display. Built as a single, self-contained HTML file with no server, dependencies, or network requests.
 
+## Play online
+
+Play the live version at <https://marcelmedina.github.io/space-quiz/>. It is deployed automatically to GitHub Pages by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on every push to `main`.
+
 ## Play locally
 
 Download or clone this repository, then open `index.html` directly in a web browser.
