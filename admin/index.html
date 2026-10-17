@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#111522">
+  <title>Cosmic Quest — Mission Control Admin</title>
+  <style>
+    :root {
+      color-scheme: dark light;
+      --bg: #111522;
+      --card: #1b2031;
+      --surface: #22283b;
+      --text: #f2f2fa;
+      --muted: #a0a7bd;
+      --border: #333b52;
+      --accent: #b4a0ff;
+      --accent-bg: #302a49;
+      --green: #77dfac;
+      --green-bg: #203b34;
+      --red: #ff939e;
+      --red-bg: #422a36;
+    }
+    @media (prefers-color-scheme: light) {
+      :root { --bg: #f5f4fa; --card: #fff; --surface: #f7f7fc; --text: #242338; --muted: #6a6980; --border: #e4e2ef; --accent: #7254cf; --accent-bg: #eee8fc; --green: #19764b; --green-bg: #e8f7ee; --red: #bb3448; --red-bg: #ffedf0; }
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      min-height: 100svh;
+      padding: 40px 20px 28px;
+      background: radial-gradient(ellipse at 50% 0, #29213d66, transparent 55%), var(--bg);
+      color: var(--text);
+      font: 15px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input { font: inherit; }
+    button:focus-visible, input:focus-visible, .table-wrap:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    main { width: min(100%, 860px); margin: auto; }
+    header { text-align: center; margin-bottom: 26px; }
+    .brand { color: var(--accent); font-size: 12px; font-weight: 750; letter-spacing: 2.4px; text-transform: uppercase; }
+    h1 { margin: 10px 0 4px; font-size: clamp(26px, 6vw, 34px); line-height: 1.25; letter-spacing: -1px; }
+    h2 { margin: 0 0 12px; font-size: 17px; }
+    .subtitle { margin: 0; color: var(--muted); }
+    a { color: var(--accent); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; margin-bottom: 20px; }
+    .key-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+    .field { display: grid; gap: 4px; flex: 1 1 220px; }
+    label { font-size: 13px; font-weight: 600; }
+    input[type="password"] { width: 100%; padding: 9px 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
+    .hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+    .btn { padding: 9px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 600; cursor: pointer; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .toolbar h2 { margin: 0; }
+    .toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .toggle { display: inline-flex; align-items: center; gap: 6px; }
+    .toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
+    .live { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 650; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+    .live.on .live-dot { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: .35; } }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .stat { padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+    .stat-label { display: block; color: var(--text); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+    .stat-value, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .stat-value { font-size: 20px; color: var(--accent); font-weight: 650; }
+    .status { min-height: 1.6em; margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+    .error { color: var(--red); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { background: var(--surface); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
+    td.name { white-space: normal; overflow-wrap: anywhere; min-width: 120px; }
+    td.num, th.num { text-align: right; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tr.new td { background: var(--green-bg); }
+    .badge { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; color: var(--text); border: 1px solid var(--green); font-size: 11px; font-weight: 700; }
+    .empty { padding: 18px; color: var(--muted); text-align: center; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand">Cosmic Quest · Mission Control</div>
+      <h1>Score submissions</h1>
+      <p class="subtitle">Live feed of every score saved through the leaderboard API. <a href="../index.html">Back to the quiz</a></p>
+    </header>
+
+    <section class="card" id="auth" aria-labelledby="auth-title">
+      <h2 id="auth-title">Admin access</h2>
+      <form class="key-form" id="key-form">
+        <div class="field">
+          <label for="admin-key">Admin key</label>
+          <input type="password" id="admin-key" autocomplete="current-password" required spellcheck="false" aria-describedby="auth-hint auth-error">
+        </div>
+        <button type="submit" class="btn btn-primary">Connect</button>
+      </form>
+      <p class="hint error" id="auth-error" role="alert"></p>
+      <p class="hint" id="auth-hint">Use the Function App's <code>ADMIN_API_KEY</code> setting. The key is kept only in this tab's session storage.</p>
+    </section>
+
+    <section class="card" id="dashboard" aria-labelledby="dashboard-title" hidden>
+      <div class="toolbar">
+        <h2 id="dashboard-title" tabindex="-1">Submissions</h2>
+        <div class="toolbar-actions">
+          <span class="live" id="live"><span class="live-dot" aria-hidden="true"></span><span id="live-text">Paused</span></span>
+          <label class="toggle"><input type="checkbox" id="auto-refresh" checked> Auto-refresh (10s)</label>
+          <button type="button" class="btn" id="refresh">Refresh now</button>
+          <button type="button" class="btn" id="sign-out">Forget key</button>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="stat-label">Submissions</span><span class="stat-value" id="stat-total">—</span></div>
+        <div class="stat"><span class="stat-label">Average score</span><span class="stat-value" id="stat-average">—</span></div>
+        <div class="stat"><span class="stat-label">Perfect scores</span><span class="stat-value" id="stat-perfect">—</span></div>
+        <div class="stat"><span class="stat-label">Fastest perfect</span><span class="stat-value" id="stat-fastest">—</span></div>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Score submissions, newest first">
+        <table>
+          <thead>
+            <tr><th scope="col">Submitted</th><th scope="col">Name</th><th scope="col" class="num">Score</th><th scope="col" class="num">Time</th><th scope="col">Order</th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const ADMIN_API = "https://space-quiz-dxb7dmfrb2hmcfbx.australiaeast-01.azurewebsites.net/api/scores/all";
+    const KEY_STORAGE = "cosmic-quest-admin-key";
+    const REFRESH_MS = 10000;
+    const $ = id => document.getElementById(id);
+
+    let adminKey = sessionStorage.getItem(KEY_STORAGE) || "";
+    const NEW_HIGHLIGHT_MS = 60000;
+    let firstSeen = null;
+    let timer = null;
+    let loading = false;
+
+    const formatTime = ms => {
+      const total = Math.round(ms / 1000);
+      return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+    };
+    const formatDate = iso => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
+
+    function setStatus(text, isError = false) {
+      $("status").textContent = text;
+      $("status").classList.toggle("error", isError);
+    }
+
+    function scheduleRefresh() {
+      clearInterval(timer);
+      timer = adminKey && $("auto-refresh").checked && !document.hidden ? setInterval(loadScores, REFRESH_MS) : null;
+      $("live").classList.toggle("on", !!timer);
+      $("live-text").textContent = timer ? "Live" : "Paused";
+    }
+
+    function renderStats(data) {
+      const entries = data.entries;
+      $("stat-total").textContent = data.total;
+      if (!entries.length) {
+        ["stat-average", "stat-perfect", "stat-fastest"].forEach(id => $(id).textContent = "—");
+        return;
+      }
+      const perfect = entries.filter(e => e.score === e.total);
+      $("stat-average").textContent = (entries.reduce((sum, e) => sum + e.score, 0) / entries.length).toFixed(1);
+      $("stat-perfect").textContent = perfect.length;
+      $("stat-fastest").textContent = perfect.length ? formatTime(Math.min(...perfect.map(e => e.timeMs))) : "—";
+    }
+
+    function renderRows(entries) {
+      const body = $("rows");
+      body.replaceChildren();
+      if (!entries.length) {
+        const cell = body.insertRow().insertCell();
+        cell.colSpan = 5;
+        cell.className = "empty";
+        cell.textContent = "No scores have been submitted yet.";
+      }
+      // Rows present on the first load are baseline (seen at 0); later arrivals stay highlighted for a minute.
+      const initial = firstSeen === null;
+      firstSeen ??= new Map();
+      const now = Date.now();
+      let newCount = 0;
+      for (const e of entries) {
+        if (!firstSeen.has(e.id)) {
+          firstSeen.set(e.id, initial ? 0 : now);
+          if (!initial) newCount++;
+        }
+        const row = body.insertRow();
+        const date = row.insertCell();
+        date.textContent = formatDate(e.date);
+        if (now - firstSeen.get(e.id) < NEW_HIGHLIGHT_MS) {
+          row.className = "new";
+          const badge = document.createElement("span");
+          badge.className = "badge";
+          badge.textContent = "New";
+          date.append(badge);
+        }
+        const name = row.insertCell();
+        name.className = "name";
+        name.textContent = e.name;
+        const score = row.insertCell();
+        score.className = "num mono";
+        score.textContent = `${e.score}/${e.total}`;
+        const time = row.insertCell();
+        time.className = "num mono";
+        time.textContent = formatTime(e.timeMs);
+        row.insertCell().textContent = e.mode === "shuffled" ? "Shuffled" : "Original";
+      }
+      return newCount;
+    }
+
+    async function loadScores() {
+      if (!adminKey || loading) return;
+      loading = true;
+      $("refresh").disabled = true;
+      try {
+        const response = await fetch(ADMIN_API, { cache: "no-store", headers: { "X-Admin-Key": adminKey } });
+        if (response.status === 401) {
+          forgetKey("That admin key was rejected. Enter a valid key.");
+          return;
+        }
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data) throw new Error(data?.error || `The API responded with ${response.status}.`);
+
+        renderStats(data);
+        const newCount = renderRows(data.entries);
+        const fresh = newCount ? ` ${newCount} new submission${newCount === 1 ? "" : "s"}.` : "";
+        const shown = data.entries.length < data.total ? ` Showing the latest ${data.entries.length}.` : "";
+        setStatus(`Updated ${new Date().toLocaleTimeString()}.${fresh}${shown}`);
+      } catch (error) {
+        setStatus(`Could not load scores (${error.message || "the API is unreachable"}). Retrying on the next refresh.`, true);
+      } finally {
+        loading = false;
+        $("refresh").disabled = false;
+      }
+    }
+
+    function connect() {
+      $("auth").hidden = true;
+      $("dashboard").hidden = false;
+      $("auth-error").textContent = "";
+      setStatus("Loading scores…");
+      loadScores();
+      scheduleRefresh();
+    }
+
+    function forgetKey(message = "") {
+      adminKey = "";
+      firstSeen = null;
+      sessionStorage.removeItem(KEY_STORAGE);
+      scheduleRefresh();
+      $("admin-key").value = "";
+      $("auth-error").textContent = message;
+      $("dashboard").hidden = true;
+      $("auth").hidden = false;
+      $("admin-key").focus();
+    }
+
+    $("key-form").addEventListener("submit", event => {
+      event.preventDefault();
+      const value = $("admin-key").value.trim();
+      if (!value) return;
+      adminKey = value;
+      sessionStorage.setItem(KEY_STORAGE, adminKey);
+      connect();
+      $("dashboard-title").focus();
+    });
+    $("refresh").addEventListener("click", loadScores);
+    $("auto-refresh").addEventListener("change", scheduleRefresh);
+    $("sign-out").addEventListener("click", () => forgetKey());
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && $("auto-refresh").checked) loadScores();
+      scheduleRefresh();
+    });
+
+    if (adminKey) connect();
+  </script>
+</body>
+</html>

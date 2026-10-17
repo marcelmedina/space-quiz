@@ -42,8 +42,21 @@ The API is a .NET 10 Azure Functions app in [`api/`](api/), deployed to the `spa
 | --- | --- | --- |
 | `POST` | `/api/scores` | Validates and records `{ "name", "score", "timeMs", "mode" }`. Returns `201` with the stored entry, or `400` with `{ "error" }`. |
 | `GET` | `/api/scores` | Returns the top 10 entries. |
+| `GET` | `/api/scores/all` | Admin only. Requires the `X-Admin-Key` header to match the `ADMIN_API_KEY` app setting. Returns `{ "total", "generatedAt", "entries" }` with the latest submissions first (`?limit=`, default 200, max 1000). Returns `401` for a missing or wrong key and `503` if `ADMIN_API_KEY` is not set. |
 
 Entries are stored in Azure Table Storage (table `scores`) in the Function App's `AzureWebJobsStorage` account.
+
+### Admin dashboard
+
+Open [`/admin/`](https://marcelmedina.github.io/space-quiz/admin/) (or `admin/index.html` locally) to watch every submitted score. Enter the admin key once per browser tab; the page refreshes automatically every 10 seconds (pausing while the tab is hidden), highlights new submissions, and offers a manual **Refresh now** button. The key is never embedded in the page and is kept only in the tab's session storage.
+
+Set the key on the Function App before using the dashboard:
+
+```powershell
+az functionapp config appsettings set --name space-quiz --resource-group <resource-group> --settings ADMIN_API_KEY=<long-random-secret>
+```
+
+`local.settings.json` uses `local-dev-admin-key` for local development.
 
 To run the API locally, start [Azurite](https://learn.microsoft.com/azure/storage/common/storage-use-azurite) and then:
 
